@@ -25,6 +25,14 @@ Inside the `frontend` directory, you will find the visual layer of your app. In 
 git clone --recurse-submodules https://github.com/TiendaNube/tiendanube-app-native-template-node.git
 ```
 
+### If the frontend folder is empty
+
+The `frontend` directory is a git submodule. If you cloned the repository without the `--recurse-submodules` flag, the folder will be empty. To fix this, run:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Installing template dependencies
 
 Installing the API dependencies:

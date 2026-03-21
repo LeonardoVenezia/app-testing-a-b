@@ -1,41 +1,24 @@
-import jsonServer from "json-server";
-import path from "path";
-import low from "lowdb";
-import FileSync from "lowdb/adapters/FileSync";
+import { PrismaClient, Store } from "@prisma/client";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { TiendanubeAuthInterface } from "@features/auth";
 import { HttpErrorException } from "@utils";
 
-/**
- * this repository is temporary, please use real database to production mode
- */
-
-const userRepository = jsonServer.router(path.resolve("db.json"));
-
-const server = jsonServer.create();
-const middleware = jsonServer.defaults();
-
-server.use(middleware);
-server.use(userRepository);
-
-interface IDatabase {
-  credentials: TiendanubeAuthInterface[];
-}
-
-const adapter = new FileSync<IDatabase>(path.resolve("db.json"));
-const database = low(adapter);
+const connectionString = process.env.DATABASE_URL;
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool as any);
+const prisma = new PrismaClient({ adapter });
 
 class UserRepository {
-  save(credential: TiendanubeAuthInterface) {
-    this.createOrUpdate(credential);
+  async save(credential: TiendanubeAuthInterface): Promise<Store> {
+    return this.createOrUpdate(credential);
   }
 
-  findOne(user_id: number) {
-    const credentials = database.get("credentials").value();
-    const store = this.findValueFromProperty<TiendanubeAuthInterface, number>(
-      "user_id",
-      credentials,
-      user_id
-    );
+  async findOne(user_id: number): Promise<Store> {
+    const numericUserId = Number(user_id);
+    const store = await prisma.store.findUnique({
+      where: { user_id: numericUserId },
+    });
 
     if (!store) {
       throw new HttpErrorException(
@@ -46,38 +29,30 @@ class UserRepository {
     return store;
   }
 
-  findFirst(): TiendanubeAuthInterface {
-    return database.get("credentials").value()?.[0];
+  async findFirst(): Promise<Store | null> {
+    return prisma.store.findFirst();
   }
 
-  private createOrUpdate(data: TiendanubeAuthInterface) {
-    const credentials = database.get("credentials").value() ?? [];
-    const hasCredentials = this.findValueFromProperty<TiendanubeAuthInterface>(
-      "user_id",
-      credentials,
-      data.user_id
-    );
-
-    if (hasCredentials) {
-      const index = credentials.findIndex(
-        (credential) => credential.user_id === data.user_id
-      );
-      credentials.splice(index, 1, data);
-    } else {
-      credentials?.push(data);
-    }
-    database.set("credentials", credentials).write();
-  }
-
-  private findValueFromProperty<T, K = any>(
-    property: string,
-    list: T[],
-    value: K
-  ): T | undefined {
-    const findValue = list?.find(
-      (values) => (values as any)[property] === Number(value)
-    );
-    return findValue;
+  private async createOrUpdate(data: TiendanubeAuthInterface): Promise<Store> {
+    const numericUserId = Number(data.user_id);
+    return prisma.store.upsert({
+      where: { user_id: numericUserId },
+      create: {
+        user_id: numericUserId,
+        access_token: data.access_token,
+        token_type: data.token_type,
+        scope: data.scope,
+        error: data.error,
+        error_description: data.error_description,
+      },
+      update: {
+        access_token: data.access_token,
+        token_type: data.token_type,
+        scope: data.scope,
+        error: data.error,
+        error_description: data.error_description,
+      },
+    });
   }
 }
 

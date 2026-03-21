@@ -25,3 +25,4 @@ db.json
 *.sln
 *.sw?
 .env
+/generated/prisma

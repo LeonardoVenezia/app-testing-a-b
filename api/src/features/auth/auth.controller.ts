@@ -23,7 +23,7 @@ class AuthenticationController {
     next: NextFunction
   ): Promise<Response | void> {
     try {
-      const data = AuthService.login(req.body);
+      const data = await AuthService.login(req.body);
       return res.status(StatusCode.OK).json(data);
     } catch (e) {
       return next(e);

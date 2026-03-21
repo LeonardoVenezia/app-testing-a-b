@@ -27,7 +27,7 @@ class InstallAppService {
     }
 
     // Insert response of Authentication API at db.json file
-    userRepository.save(authenticateResponse);
+    await userRepository.save(authenticateResponse);
 
     return authenticateResponse;
   }

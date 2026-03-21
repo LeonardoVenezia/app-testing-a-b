@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Store {
+  user_id           Int     @id
+  access_token      String?
+  token_type        String?
+  scope             String?
+  error             String?
+  error_description String?
+}
