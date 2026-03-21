@@ -7,10 +7,34 @@ datasource db {
 }
 
 model Store {
-  user_id           Int     @id
+  user_id           Int      @id
   access_token      String?
   token_type        String?
   scope             String?
   error             String?
   error_description String?
+  ab_tests          AbTest[]
+}
+
+enum TestStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+model AbTest {
+  id                  String     @id @default(uuid())
+  store_id            Int
+  name                String
+  status              TestStatus @default(ACTIVE)
+  original_product_id Int
+  variant_product_id  Int
+  original_views      Int        @default(0)
+  variant_views       Int        @default(0)
+  original_sales      Int        @default(0)
+  variant_sales       Int        @default(0)
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
+
+  store Store @relation(fields: [store_id], references: [user_id])
 }

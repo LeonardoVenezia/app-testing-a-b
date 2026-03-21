@@ -4,9 +4,38 @@ import passport from "passport";
 import { AuthenticationController } from "@features/auth";
 import { ProductController } from "@features/product";
 import { BillingController } from "@features/billing";
+import { AbTestController } from "@features/ab-test";
 
 const routes = Router();
 routes.get("/auth/install", AuthenticationController.install);
+
+// --- A/B TESTS ---
+routes.post(
+  "/ab-tests",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.create as any
+);
+routes.get(
+  "/ab-tests",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.getAll as any
+);
+routes.get(
+  "/ab-tests/:id",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.getOne as any
+);
+routes.patch(
+  "/ab-tests/:id",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.updateStatus as any
+);
+routes.delete(
+  "/ab-tests/:id",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.delete as any
+);
+
 routes.post(
   "/products",
   passport.authenticate("jwt", { session: false }),
