@@ -9,6 +9,27 @@ import { AbTestController } from "@features/ab-test";
 const routes = Router();
 routes.get("/auth/install", AuthenticationController.install);
 
+// --- WEBHOOKS ---
+import { WebhookController } from "@features/webhook";
+import { ScriptTagController } from "@features/script-tag";
+
+// Server the script itself
+routes.get("/script-tag/storefront.js", ScriptTagController.serveScript as any);
+// Server the configuration for a specific store
+routes.get("/script-tag/config/:storeId", ScriptTagController.getConfig as any);
+// Log user view interactions
+routes.post("/script-tag/config/:storeId/log-view", ScriptTagController.logView as any);
+
+routes.post(
+  "/webhooks/order-created",
+  WebhookController.handleOrderCreated as any
+);
+
+routes.post(
+  "/webhooks/order-cancelled",
+  WebhookController.handleOrderCancelled as any
+);
+
 // --- A/B TESTS ---
 routes.post(
   "/ab-tests",
