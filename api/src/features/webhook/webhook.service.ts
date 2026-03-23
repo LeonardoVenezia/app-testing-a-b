@@ -1,12 +1,6 @@
-import { PrismaClient, TestStatus } from "@prisma/client";
+import prisma from "../../config/prisma";
+import { TestStatus } from "@prisma/client";
 import { tiendanubeApiClient } from "@config";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-const connectionString = process.env.DATABASE_URL;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
 
 class WebhookService {
   async handleOrderCreated(storeId: number, orderData: any) {

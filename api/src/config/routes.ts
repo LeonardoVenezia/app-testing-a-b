@@ -15,10 +15,12 @@ import { ScriptTagController } from "@features/script-tag";
 
 // Server the script itself
 routes.get("/script-tag/storefront.js", ScriptTagController.serveScript as any);
-// Server the configuration for a specific store
+// Serve the configuration for a specific store
 routes.get("/script-tag/config/:storeId", ScriptTagController.getConfig as any);
 // Log user view interactions
 routes.post("/script-tag/config/:storeId/log-view", ScriptTagController.logView as any);
+// DEBUG: list all scripts registered with Tiendanube for a store
+routes.get("/script-tag/debug/:storeId", ScriptTagController.debugListScripts as any);
 
 routes.post(
   "/webhooks/order-created",

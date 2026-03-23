@@ -68,23 +68,6 @@ class AbTestService {
       variant_sales: 0,
     });
 
-    // 5. Register webhooks if not already registered (best effort)
-    const appUrl = process.env.APP_URL;
-    if (appUrl) {
-      try {
-        await tiendanubeApiClient.post(`${store_id}/webhooks`, {
-          event: "order/created",
-          url: `${appUrl}/webhooks/order-created`
-        });
-        await tiendanubeApiClient.post(`${store_id}/webhooks`, {
-          event: "order/cancelled",
-          url: `${appUrl}/webhooks/order-cancelled`
-        });
-      } catch (e: any) {
-        // Ignored. Conflicts just mean they are already registered.
-      }
-    }
-
     return newTest;
   }
 

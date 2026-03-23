@@ -3,10 +3,15 @@
   
   // 1. Fetch the active test config for this store
   // Tiendanube injects `LS.store` in the window object.
-  const storeId = window.LS && window.LS.store ? window.LS.store : null;
+  let storeId = null;
+  if (window.LS && window.LS.store) {
+    storeId = typeof window.LS.store === 'object' ? window.LS.store.id : window.LS.store;
+  }
   
+  console.log("[A/B Tests] Detected Store ID:", storeId);
+
   if (!storeId) {
-    console.warn("[A/B Tests] Could not find Store ID in window.LS");
+    console.warn("[A/B Tests] Could not find Store ID in window.LS.store");
     return;
   }
 

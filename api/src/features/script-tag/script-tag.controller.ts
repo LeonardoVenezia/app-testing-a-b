@@ -1,15 +1,9 @@
 import { Request, Response } from "express";
-import { PrismaClient, TestStatus } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-// Boilerplate for native Postgres client
-const connectionString = process.env.DATABASE_URL;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
+import prisma from "../../config/prisma";
+import { TestStatus } from "@prisma/client";
+import { tiendanubeApiClient } from "../../config/tiendanube-api.client";
 
 class ScriptTagController {
   
@@ -70,6 +64,16 @@ class ScriptTagController {
        console.error("Error logging ScriptTag view:", e);
        res.status(500).send("Error");
      }
+  }
+  // GET /script-tag/debug/:storeId — list all registered scripts with Tiendanube
+  async debugListScripts(req: Request, res: Response) {
+    const storeId = req.params.storeId;
+    try {
+      const result = await tiendanubeApiClient.get(`${storeId}/scripts`);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.response?.data || e.message });
+    }
   }
 }
 

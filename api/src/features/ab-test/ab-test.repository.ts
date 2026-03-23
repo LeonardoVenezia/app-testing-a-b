@@ -1,12 +1,6 @@
-import { PrismaClient, AbTest, TestStatus } from "@prisma/client";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
+import prisma from "../../config/prisma";
+import { AbTest, TestStatus } from "@prisma/client";
 import { HttpErrorException } from "@utils";
-
-const connectionString = process.env.DATABASE_URL;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
 
 class AbTestRepository {
   async create(data: Omit<AbTest, "id" | "created_at" | "updated_at">): Promise<AbTest> {

@@ -1,13 +1,7 @@
-import { PrismaClient, Store } from "@prisma/client";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
+import prisma from "../config/prisma";
+import { Store } from "@prisma/client";
 import { TiendanubeAuthInterface } from "@features/auth";
 import { HttpErrorException } from "@utils";
-
-const connectionString = process.env.DATABASE_URL;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
 
 class UserRepository {
   async save(credential: TiendanubeAuthInterface): Promise<Store> {
