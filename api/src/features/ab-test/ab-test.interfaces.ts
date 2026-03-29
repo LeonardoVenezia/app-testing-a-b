@@ -10,9 +10,14 @@ export interface IVariantModifications {
   price?: string;
   /**
    * If provided, replaces the product images entirely.
-   * Each item must have a `src` field with a publicly accessible URL.
+   * Each item must have a `src` field (public URL) OR an `attachment` field (base64) 
+   * with a `filename`.
    */
-  images?: { src: string }[];
+  images?: { src?: string; attachment?: string; filename?: string }[];
+  /**
+   * Optional video URL for the product variant (e.g. YouTube or Vimeo link).
+   */
+  video_url?: string;
 }
 
 export interface ICreateAbTestRequest {

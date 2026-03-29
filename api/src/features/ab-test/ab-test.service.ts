@@ -48,6 +48,7 @@ class AbTestService {
       description: data.variant_modifications.description || originalProduct.description,
       tags: originalProduct.tags ? `${originalProduct.tags}, ab-test-variant` : "ab-test-variant",
       published: true, // Needs to be published to be visible to group B
+      ...(data.variant_modifications.video_url !== undefined && { video_url: data.variant_modifications.video_url })
     };
 
     // If image overrides were provided replace the images array entirely;
