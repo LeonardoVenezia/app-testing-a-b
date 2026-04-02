@@ -53,28 +53,34 @@
     document.cookie = name + "=" + (value || "")  + expires + "; path=/";
   }
 
-  // Group assignment: A = Original, B = Variant
-  let group = getCookie("ab_test_group");
-  if (!group) {
-    group = Math.random() < 0.5 ? "A" : "B";
-    setCookie("ab_test_group", group, 30); // 30 day cookie
-  }
-
   // Fetch configs
   fetch(`${backendUrl}/script-tag/config/${storeId}`)
     .then(res => res.json())
     .then(tests => {
        if (!tests || tests.length === 0) return;
 
+       // Group assignment per test
+       const groups = {};
+       tests.forEach(test => {
+         const cookieName = `ab_test_group_${test.id}`;
+         let g = getCookie(cookieName);
+         if (!g) {
+           g = Math.random() < 0.5 ? "A" : "B";
+           setCookie(cookieName, g, 30); // 30 day cookie
+         }
+         groups[test.id] = g;
+       });
+
        // Group enforcement dynamically based on product URLs
        if (currentProductId) {
          for (let test of tests) {
-           if (currentProductId == test.variant_product_id && group === "A") {
-             group = "B";
-             setCookie("ab_test_group", "B", 30);
-           } else if (currentProductId == test.original_product_id && group === "B") {
-             group = "A";
-             setCookie("ab_test_group", "A", 30);
+           let g = groups[test.id];
+           if (currentProductId == test.variant_product_id && g === "A") {
+             groups[test.id] = "B";
+             setCookie(`ab_test_group_${test.id}`, "B", 30);
+           } else if (currentProductId == test.original_product_id && g === "B") {
+             groups[test.id] = "A";
+             setCookie(`ab_test_group_${test.id}`, "A", 30);
            }
          }
        }
@@ -93,7 +99,8 @@
 
        // Hide the product we don't want them to see on product lists, sliders, home page...
        const hiddenProductIds = tests.map(test => {
-         return group === "A" ? test.variant_product_id : test.original_product_id;
+         const g = groups[test.id];
+         return g === "A" ? test.variant_product_id : test.original_product_id;
        });
 
        // Layer A: CSS attribute selectors (Immediate)
@@ -139,7 +146,7 @@
               fetch(`${backendUrl}/script-tag/config/${storeId}/log-view`, {
                  method: "POST",
                  headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({ test_id: activeTest.id, group })
+                 body: JSON.stringify({ test_id: activeTest.id, group: groups[activeTest.id] })
               }).catch(err => console.error("[A/B Tests] Could not log view", err));
             }
          }
