@@ -28,20 +28,34 @@ class AbTestService {
       ...productData
     } = originalProduct as any;
 
-    // Deep clone variants to remove their IDs if they exist
+    // Deep clone variants to remove their IDs if they exist.
+    // If a price override was provided, apply it to every variant.
     const clonedVariants = variants ? variants.map((v: any) => {
       const { id, product_id, created_at, updated_at, ...vData } = v;
+      if (data.variant_modifications.price !== undefined && data.variant_modifications.price !== '') {
+        vData.price = data.variant_modifications.price;
+        // Also clear promotional_price so the override is the actual selling price
+        vData.promotional_price = null;
+      }
       return vData;
     }) : [];
 
-    const clonedProduct = {
+    // Build the cloned product payload
+    const clonedProduct: any = {
       ...productData,
       variants: clonedVariants,
       name: data.variant_modifications.name || `${originalProduct.name} (Variant B)`,
       description: data.variant_modifications.description || originalProduct.description,
       tags: originalProduct.tags ? `${originalProduct.tags}, ab-test-variant` : "ab-test-variant",
       published: true, // Needs to be published to be visible to group B
+      ...(data.variant_modifications.video_url !== undefined && { video_url: data.variant_modifications.video_url })
     };
+
+    // If image overrides were provided replace the images array entirely;
+    // otherwise the spread from productData already copied the originals.
+    if (data.variant_modifications.images && data.variant_modifications.images.length > 0) {
+      clonedProduct.images = data.variant_modifications.images;
+    }
 
     // 3. Create the variant product in Tiendanube
     let createdVariant: any;
@@ -66,6 +80,8 @@ class AbTestService {
       variant_views: 0,
       original_sales: 0,
       variant_sales: 0,
+      original_revenue: 0,
+      variant_revenue: 0,
     });
 
     return newTest;
