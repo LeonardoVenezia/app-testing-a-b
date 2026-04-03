@@ -33,8 +33,38 @@ model AbTest {
   variant_views       Int        @default(0)
   original_sales      Int        @default(0)
   variant_sales       Int        @default(0)
+  original_revenue    Float      @default(0)
+  variant_revenue     Float      @default(0)
   created_at          DateTime   @default(now())
   updated_at          DateTime   @updatedAt
 
-  store Store @relation(fields: [store_id], references: [user_id])
+  store           Store           @relation(fields: [store_id], references: [user_id])
+  tracking_events TrackingEvent[]
+}
+
+enum EventType {
+  PAGE_VIEW
+  TIME_ON_PAGE
+  IMAGE_CLICK
+  DESCRIPTION_INTERACTION
+  ADD_TO_CART
+  CHECKOUT_STARTED
+  ORDER_COMPLETED
+  ORDER_PAID
+}
+
+model TrackingEvent {
+  id         String    @id @default(uuid())
+  test_id    String
+  variant    String    // "A" or "B"
+  event_type EventType
+  session_id String
+  payload    Json?     // flexible: { duration_seconds, order_id, revenue, etc. }
+  created_at DateTime  @default(now())
+
+  ab_test AbTest @relation(fields: [test_id], references: [id], onDelete: Cascade)
+
+  @@index([test_id, event_type])
+  @@index([test_id, session_id, event_type])
+  @@index([session_id])
 }

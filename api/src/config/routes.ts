@@ -5,6 +5,7 @@ import { AuthenticationController } from "@features/auth";
 import { ProductController } from "@features/product";
 import { BillingController } from "@features/billing";
 import { AbTestController } from "@features/ab-test";
+import { TrackingController } from "@features/tracking";
 
 const routes = Router();
 routes.get("/auth/install", AuthenticationController.install);
@@ -21,6 +22,8 @@ routes.get("/script-tag/config/:storeId", ScriptTagController.getConfig as any);
 routes.post("/script-tag/config/:storeId/log-view", ScriptTagController.logView as any);
 // DEBUG: list all scripts registered with Tiendanube for a store
 routes.get("/script-tag/debug/:storeId", ScriptTagController.debugListScripts as any);
+// Re-register the script tag with correct src URL
+routes.post("/script-tag/register/:storeId", ScriptTagController.registerScript as any);
 
 routes.post(
   "/webhooks/order-created",
@@ -28,8 +31,22 @@ routes.post(
 );
 
 routes.post(
+  "/webhooks/order-paid",
+  WebhookController.handleOrderPaid as any
+);
+
+routes.post(
   "/webhooks/order-cancelled",
   WebhookController.handleOrderCancelled as any
+);
+
+// --- TRACKING (public, no auth - called from storefront) ---
+routes.post("/api/track", TrackingController.ingest as any);
+// --- TRACKING (authenticated - dashboard metrics) ---
+routes.get(
+  "/api/track/metrics/:testId",
+  passport.authenticate("jwt", { session: false }),
+  TrackingController.getMetrics as any
 );
 
 // --- A/B TESTS ---

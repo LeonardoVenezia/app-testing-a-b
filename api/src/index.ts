@@ -25,6 +25,7 @@ app.use(
 );
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
+app.use(express.text({ type: "text/plain", limit: "1mb" }));
 app.use(beforeCheckClientMiddleware);
 app.use(AppRoutes);
 app.use(errorHandlingMiddleware);

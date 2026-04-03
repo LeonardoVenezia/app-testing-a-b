@@ -80,6 +80,8 @@ class AbTestService {
       variant_views: 0,
       original_sales: 0,
       variant_sales: 0,
+      original_revenue: 0,
+      variant_revenue: 0,
     });
 
     return newTest;

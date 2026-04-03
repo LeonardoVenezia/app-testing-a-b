@@ -12,8 +12,7 @@ class ScriptTagController {
     const scriptPath = path.join(__dirname, "storefront-script.js");
     if (fs.existsSync(scriptPath)) {
       res.setHeader("Content-Type", "application/javascript");
-      // Add generous cache because it's static
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.status(200).send(fs.readFileSync(scriptPath, "utf8"));
     } else {
       res.status(404).send("Not found");
@@ -46,7 +45,7 @@ class ScriptTagController {
     }
   }
 
-  // POST /script-tag/config/:storeId/log-view
+  // POST /script-tag/config/:storeId/log-view (legacy, kept for backward compat)
   async logView(req: Request, res: Response) {
      const { test_id, group } = req.body;
      if (!test_id || !group) {
@@ -65,6 +64,37 @@ class ScriptTagController {
        res.status(500).send("Error");
      }
   }
+  // POST /script-tag/register/:storeId — delete old and register script with correct src
+  async registerScript(req: Request, res: Response) {
+    const storeId = req.params.storeId;
+    const appUrl = process.env.APP_URL || "https://back.leovenezia.dev";
+    const scriptSrc = `${appUrl}/script-tag/storefront.js`;
+
+    try {
+      // Delete all existing scripts first
+      const existing = await tiendanubeApiClient.get(`${storeId}/scripts`) as any;
+      if (existing && Array.isArray(existing)) {
+        for (const s of existing) {
+          try {
+            await tiendanubeApiClient.delete(`${storeId}/scripts/${s.id}`);
+          } catch (e) {}
+        }
+      }
+
+      // Register new script with src
+      const result = await tiendanubeApiClient.post(`${storeId}/scripts`, {
+        src: scriptSrc,
+        event: "onload",
+        where: "store",
+      });
+
+      res.json({ success: true, script: result });
+    } catch (e: any) {
+      console.error("Error registering script:", e.response?.data || e.message);
+      res.status(500).json({ error: e.response?.data || e.message });
+    }
+  }
+
   // GET /script-tag/debug/:storeId — list all registered scripts with Tiendanube
   async debugListScripts(req: Request, res: Response) {
     const storeId = req.params.storeId;
