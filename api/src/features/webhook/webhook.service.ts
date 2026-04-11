@@ -4,28 +4,55 @@ import { tiendanubeApiClient } from "@config";
 import trackingRepository from "../tracking/tracking.repository";
 
 class WebhookService {
-  async handleOrderCreated(storeId: number, orderData: any) {
-    if (!orderData.products || !Array.isArray(orderData.products)) return;
-
-    for (const item of orderData.products) {
-      await this.processOrderItem(storeId, orderData, item, "created");
+  /**
+   * Fetch full order from Tiendanube API since webhook payloads
+   * only contain a minimal summary (id, store_id) without products.
+   */
+  private async fetchFullOrder(storeId: number, orderId: number): Promise<any | null> {
+    try {
+      return await tiendanubeApiClient.get(`${storeId}/orders/${orderId}`) as any;
+    } catch (e: any) {
+      console.error(`[Webhook] Failed to fetch order ${orderId} for store ${storeId}:`, e.message);
+      return null;
     }
   }
 
-  async handleOrderCancelled(storeId: number, orderData: any) {
-    if (!orderData.products || !Array.isArray(orderData.products)) return;
+  async handleOrderCreated(storeId: number, webhookPayload: any) {
+    console.log(`[Webhook] order/created received for store ${storeId}:`, JSON.stringify(webhookPayload));
+    const orderId = webhookPayload.id;
+    if (!orderId) { console.warn('[Webhook] No order ID in payload'); return; }
 
-    for (const item of orderData.products) {
+    const order = await this.fetchFullOrder(storeId, orderId);
+    if (!order?.products?.length) { console.warn(`[Webhook] Order ${orderId} has no products or fetch failed`); return; }
+
+    for (const item of order.products) {
+      await this.processOrderItem(storeId, order, item, "created");
+    }
+  }
+
+  async handleOrderCancelled(storeId: number, webhookPayload: any) {
+    console.log(`[Webhook] order/cancelled received for store ${storeId}:`, JSON.stringify(webhookPayload));
+    const orderId = webhookPayload.id;
+    if (!orderId) { console.warn('[Webhook] No order ID in payload'); return; }
+
+    const order = await this.fetchFullOrder(storeId, orderId);
+    if (!order?.products?.length) { console.warn(`[Webhook] Order ${orderId} has no products or fetch failed`); return; }
+
+    for (const item of order.products) {
       await this.syncStockOnCancel(storeId, item);
     }
   }
 
-  // Called externally if you register order/paid webhook
-  async handleOrderPaid(storeId: number, orderData: any) {
-    if (!orderData.products || !Array.isArray(orderData.products)) return;
+  async handleOrderPaid(storeId: number, webhookPayload: any) {
+    console.log(`[Webhook] order/paid received for store ${storeId}:`, JSON.stringify(webhookPayload));
+    const orderId = webhookPayload.id;
+    if (!orderId) { console.warn('[Webhook] No order ID in payload'); return; }
 
-    for (const item of orderData.products) {
-      await this.processOrderItem(storeId, orderData, item, "paid");
+    const order = await this.fetchFullOrder(storeId, orderId);
+    if (!order?.products?.length) { console.warn(`[Webhook] Order ${orderId} has no products or fetch failed`); return; }
+
+    for (const item of order.products) {
+      await this.processOrderItem(storeId, order, item, "paid");
     }
   }
 
@@ -57,23 +84,27 @@ class WebhookService {
     const variant = isOriginal ? "A" : "B";
     const eventType = stage === "created" ? "ORDER_COMPLETED" : "ORDER_PAID";
 
-    // Try to find session_id from a previous tracking event for this customer
-    // Use order customer_id or email as fallback session lookup
+    // Attribute this order to a storefront session.
+    // Priority: CHECKOUT_STARTED > ADD_TO_CART > PAGE_VIEW (most recent within 24h)
     let sessionId = "webhook_" + (orderData.id || Date.now());
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Attempt attribution: look for a recent session that interacted with this test
-    if (orderData.customer?.id) {
-      // Check if there's a stored session from the storefront
-      const recentEvent = await prisma.trackingEvent.findFirst({
-        where: {
-          test_id: test.id,
-          variant,
-          event_type: { in: ["ADD_TO_CART", "CHECKOUT_STARTED", "PAGE_VIEW"] },
-        },
-        orderBy: { created_at: "desc" },
-        select: { session_id: true },
-      });
-      if (recentEvent) sessionId = recentEvent.session_id;
+    const recentEvent = await prisma.trackingEvent.findFirst({
+      where: {
+        test_id: test.id,
+        variant,
+        event_type: { in: ["CHECKOUT_STARTED", "ADD_TO_CART", "PAGE_VIEW"] },
+        created_at: { gte: oneDayAgo },
+      },
+      orderBy: [
+        // Prefer the deepest funnel event first, then most recent
+        { event_type: "desc" },
+        { created_at: "desc" },
+      ],
+      select: { session_id: true },
+    });
+    if (recentEvent && !recentEvent.session_id.startsWith("webhook_")) {
+      sessionId = recentEvent.session_id;
     }
 
     // Record the tracking event
