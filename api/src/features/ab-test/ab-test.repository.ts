@@ -39,6 +39,19 @@ class AbTestRepository {
       where: { id: test_id },
     });
   }
+
+  async findActiveByProductId(store_id: number, product_id: number): Promise<AbTest | null> {
+    return prisma.abTest.findFirst({
+      where: {
+        store_id,
+        status: "ACTIVE",
+        OR: [
+          { original_product_id: product_id },
+          { variant_product_id: product_id },
+        ],
+      },
+    });
+  }
 }
 
 export default new AbTestRepository();

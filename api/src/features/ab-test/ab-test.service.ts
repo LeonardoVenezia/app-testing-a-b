@@ -6,6 +6,12 @@ import { HttpErrorException } from "@utils";
 
 class AbTestService {
   async create(store_id: number, data: ICreateAbTestRequest): Promise<AbTest> {
+    // 0. Check no active test exists for this product
+    const existing = await abTestRepository.findActiveByProductId(store_id, data.original_product_id);
+    if (existing) {
+      throw new HttpErrorException("Ya existe un test activo para este producto").setStatusCode(409);
+    }
+
     // 1. Fetch original product from Tiendanube
     let originalProduct: any;
     try {
@@ -101,7 +107,16 @@ class AbTestService {
     status: TestStatus
   ): Promise<AbTest> {
     // Verify ownership first
-    await abTestRepository.findOne(store_id, test_id);
+    const test = await abTestRepository.findOne(store_id, test_id);
+
+    // When reactivating, check no other active test exists for this product
+    if (status === TestStatus.ACTIVE) {
+      const existing = await abTestRepository.findActiveByProductId(store_id, test.original_product_id);
+      if (existing && existing.id !== test_id) {
+        throw new HttpErrorException("Ya existe otro test activo para este producto").setStatusCode(409);
+      }
+    }
+
     return abTestRepository.updateStatus(test_id, status);
   }
 
