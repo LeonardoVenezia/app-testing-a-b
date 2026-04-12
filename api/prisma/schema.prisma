@@ -37,6 +37,7 @@ model AbTest {
   variant_revenue     Float      @default(0)
   created_at          DateTime   @default(now())
   updated_at          DateTime   @updatedAt
+  deleted_at          DateTime?
 
   store           Store           @relation(fields: [store_id], references: [user_id])
   tracking_events TrackingEvent[]

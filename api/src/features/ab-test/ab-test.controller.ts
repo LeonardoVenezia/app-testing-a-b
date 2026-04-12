@@ -64,6 +64,15 @@ class AbTestController {
       next(e);
     }
   }
+
+  async getDeleted(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await AbTestService.findDeleted(req.user.user_id);
+      return res.status(StatusCode.OK).json(data);
+    } catch (e) {
+      next(e);
+    }
+  }
 }
 
 export default new AbTestController();

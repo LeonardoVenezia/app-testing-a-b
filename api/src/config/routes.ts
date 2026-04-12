@@ -61,6 +61,11 @@ routes.get(
   AbTestController.getAll as any
 );
 routes.get(
+  "/ab-tests/deleted",
+  passport.authenticate("jwt", { session: false }),
+  AbTestController.getDeleted as any
+);
+routes.get(
   "/ab-tests/:id",
   passport.authenticate("jwt", { session: false }),
   AbTestController.getOne as any

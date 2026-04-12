@@ -11,8 +11,15 @@ class AbTestRepository {
 
   async findAllByStore(store_id: number): Promise<AbTest[]> {
     return prisma.abTest.findMany({
-      where: { store_id },
+      where: { store_id, deleted_at: null },
       orderBy: { created_at: "desc" },
+    });
+  }
+
+  async findDeletedByStore(store_id: number): Promise<AbTest[]> {
+    return prisma.abTest.findMany({
+      where: { store_id, deleted_at: { not: null } },
+      orderBy: { deleted_at: "desc" },
     });
   }
 
@@ -34,9 +41,10 @@ class AbTestRepository {
     });
   }
 
-  async delete(test_id: string): Promise<void> {
-    await prisma.abTest.delete({
+  async softDelete(test_id: string): Promise<void> {
+    await prisma.abTest.update({
       where: { id: test_id },
+      data: { deleted_at: new Date(), status: "FINISHED" },
     });
   }
 
@@ -45,6 +53,7 @@ class AbTestRepository {
       where: {
         store_id,
         status: "ACTIVE",
+        deleted_at: null,
         OR: [
           { original_product_id: product_id },
           { variant_product_id: product_id },

@@ -88,6 +88,7 @@ class AbTestService {
       variant_sales: 0,
       original_revenue: 0,
       variant_revenue: 0,
+      deleted_at: null,
     });
 
     return newTest;
@@ -131,7 +132,11 @@ class AbTestService {
       console.warn("Failed to delete variant product in Tiendanube, it might have been already deleted:", e.message);
     }
 
-    await abTestRepository.delete(test_id);
+    await abTestRepository.softDelete(test_id);
+  }
+
+  async findDeleted(store_id: number): Promise<AbTest[]> {
+    return abTestRepository.findDeletedByStore(store_id);
   }
 }
 
