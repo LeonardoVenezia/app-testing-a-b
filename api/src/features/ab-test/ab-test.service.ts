@@ -94,8 +94,9 @@ class AbTestService {
     return newTest;
   }
 
-  async findAll(store_id: number): Promise<AbTest[]> {
-    return abTestRepository.findAllByStore(store_id);
+  async findAll(store_id: number) {
+    const tests = await abTestRepository.findAllByStore(store_id);
+    return this.enrichWithProductData(store_id, tests);
   }
 
   async findOne(store_id: number, test_id: string): Promise<AbTest> {
@@ -135,8 +136,31 @@ class AbTestService {
     await abTestRepository.softDelete(test_id);
   }
 
-  async findDeleted(store_id: number): Promise<AbTest[]> {
-    return abTestRepository.findDeletedByStore(store_id);
+  async findDeleted(store_id: number) {
+    const tests = await abTestRepository.findDeletedByStore(store_id);
+    return this.enrichWithProductData(store_id, tests);
+  }
+
+  private async enrichWithProductData(store_id: number, tests: AbTest[]) {
+    const productIds = [...new Set(tests.map(t => t.original_product_id))];
+    const productMap = new Map<number, { image_url: string; product_name: string }>();
+
+    await Promise.allSettled(
+      productIds.map(async (pid) => {
+        try {
+          const product: any = await tiendanubeApiClient.get(`${store_id}/products/${pid}`);
+          const name = product.name?.es || product.name?.pt || product.name?.en || '';
+          const image = product.images?.[0]?.src || '';
+          productMap.set(pid, { image_url: image, product_name: name });
+        } catch { /* product may have been deleted */ }
+      })
+    );
+
+    return tests.map(t => ({
+      ...t,
+      product_image_url: productMap.get(t.original_product_id)?.image_url || '',
+      product_name: productMap.get(t.original_product_id)?.product_name || '',
+    }));
   }
 }
 
