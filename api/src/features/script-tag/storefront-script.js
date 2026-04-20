@@ -134,7 +134,7 @@
       });
 
       var css = hiddenIds.map(function(id) {
-        return '[data-product="'+id+'"], [data-product-id="'+id+'"], .product-item[data-product-id="'+id+'"] { display: none !important; }';
+        return '[data-product="'+id+'"], [data-product-id="'+id+'"], [data-item-id="'+id+'"], .product-item[data-product-id="'+id+'"], [data-product-id="'+id+'"].js-item-product { display: none !important; }';
       }).join("\n");
       var style = document.createElement("style");
       style.innerHTML = css;
@@ -142,18 +142,18 @@
 
       var hideObserver = new MutationObserver(function() {
         hiddenIds.forEach(function(id) {
-          document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked])').forEach(function(a) {
+          document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked]), a[href*="/'+id+'/"]:not([data-ab-checked]), a[href$="-'+id+'"]:not([data-ab-checked])').forEach(function(a) {
             a.setAttribute("data-ab-checked", "true");
-            var c = a.closest(".item, .product, .item-product, .js-item-product, article");
+            var c = a.closest(".item, .product, .item-product, .js-item-product, .js-product-item, .product-card, .grid-item, article, li");
             if (c) c.style.display = "none";
           });
         });
       });
       hideObserver.observe(document.body, { childList: true, subtree: true });
       hiddenIds.forEach(function(id) {
-        document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked])').forEach(function(a) {
+        document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked]), a[href*="/'+id+'/"]:not([data-ab-checked]), a[href$="-'+id+'"]:not([data-ab-checked])').forEach(function(a) {
           a.setAttribute("data-ab-checked", "true");
-          var c = a.closest(".item, .product, .item-product, .js-item-product, article");
+          var c = a.closest(".item, .product, .item-product, .js-item-product, .js-product-item, .product-card, .grid-item, article, li");
           if (c) c.style.display = "none";
         });
       });
