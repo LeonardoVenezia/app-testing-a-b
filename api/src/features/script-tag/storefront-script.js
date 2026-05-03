@@ -21,7 +21,7 @@
       }
     }
   } catch(e) {}
-  if (!backendUrl) backendUrl = "https://back.leovenezia.dev";
+  if (!backendUrl) return;
 
   // --- Session ID ---
   var SESSION_KEY = "ab_session_id";
@@ -140,23 +140,18 @@
       style.innerHTML = css;
       document.head.appendChild(style);
 
-      var hideObserver = new MutationObserver(function() {
+      function hideByDataAttr() {
         hiddenIds.forEach(function(id) {
-          document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked]), a[href*="/'+id+'/"]:not([data-ab-checked]), a[href$="-'+id+'"]:not([data-ab-checked])').forEach(function(a) {
-            a.setAttribute("data-ab-checked", "true");
-            var c = a.closest(".item, .product, .item-product, .js-item-product, .js-product-item, .product-card, .grid-item, article, li");
-            if (c) c.style.display = "none";
+          document.querySelectorAll('[data-product-id="'+id+'"]:not([data-ab-checked])').forEach(function(el) {
+            el.setAttribute("data-ab-checked", "true");
+            var c = el.closest(".js-item-product, .item, .product, .product-card, .grid-item, article, li") || el;
+            c.style.display = "none";
           });
         });
-      });
+      }
+      var hideObserver = new MutationObserver(hideByDataAttr);
       hideObserver.observe(document.body, { childList: true, subtree: true });
-      hiddenIds.forEach(function(id) {
-        document.querySelectorAll('a[href*="-'+id+'-"]:not([data-ab-checked]), a[href*="/'+id+'/"]:not([data-ab-checked]), a[href$="-'+id+'"]:not([data-ab-checked])').forEach(function(a) {
-          a.setAttribute("data-ab-checked", "true");
-          var c = a.closest(".item, .product, .item-product, .js-item-product, .js-product-item, .product-card, .grid-item, article, li");
-          if (c) c.style.display = "none";
-        });
-      });
+      hideByDataAttr();
 
       // =============================================
       // CHECKOUT_STARTED: tracked globally (cart/checkout pages)
@@ -244,21 +239,30 @@
       // --- 2. TIME_ON_PAGE ---
       var pageEnteredAt = Date.now();
       var lastTimeSent = 0;
-      function sendTimeUpdate() {
+      function getTimePayload() {
         var seconds = Math.round((Date.now() - pageEnteredAt) / 1000);
         if (seconds > lastTimeSent && seconds >= 1) {
           lastTimeSent = seconds;
-          sendDirect(makeEvent(testId, group, "TIME_ON_PAGE", { duration_seconds: seconds }));
+          return makeEvent(testId, group, "TIME_ON_PAGE", { duration_seconds: seconds });
         }
+        return null;
       }
-      // Send precise time on page exit (keepalive ensures fetch completes)
-      window.addEventListener("beforeunload", sendTimeUpdate);
-      window.addEventListener("pagehide", sendTimeUpdate);
+      function sendTimeUpdate() {
+        var evt = getTimePayload();
+        if (evt) sendDirect(evt);
+      }
+      function sendTimeOnExit() {
+        var evt = getTimePayload();
+        if (evt) sendBeaconEvent(evt);
+      }
+      // Send precise time on page exit via beacon (more reliable than fetch on unload)
+      window.addEventListener("beforeunload", sendTimeOnExit);
+      window.addEventListener("pagehide", sendTimeOnExit);
       document.addEventListener("visibilitychange", function() {
-        if (document.visibilityState === "hidden") sendTimeUpdate();
+        if (document.visibilityState === "hidden") sendTimeOnExit();
       });
-      document.addEventListener("turbolinks:before-visit", sendTimeUpdate);
-      document.addEventListener("page:before-change", sendTimeUpdate);
+      document.addEventListener("turbolinks:before-visit", sendTimeOnExit);
+      document.addEventListener("page:before-change", sendTimeOnExit);
       // Safety net: periodic update every 30s in case exit events don't fire
       setInterval(sendTimeUpdate, 30000);
 
@@ -268,7 +272,7 @@
       document.addEventListener("click", function(e) {
         var el = e.target;
         // Check if clicked element is an image or is inside a link/container wrapping an image
-        var isImg = el.tagName === "IMG" || (el.closest && el.closest("a img, button img, [data-zoom-image], .swiper-slide, .carousel-slide, .product-gallery, .product-image"));
+        var isImg = el.tagName === "IMG" || (el.closest && el.closest("a img, button img, [data-zoom-image], .swiper-slide, .carousel-slide, .product-gallery"));
         if (!isImg && el.tagName !== "IMG") {
           // Also check if the click target contains an img child (thumbnail containers)
           var childImg = el.querySelector && el.querySelector("img");
@@ -279,7 +283,7 @@
         if (img && img.naturalWidth < 50) return;
 
         // Must be in the product detail area (not header/footer)
-        var productArea = el.closest && el.closest("#product-container, .product-detail, .js-product-detail, .js-product-container, main, [data-product], .product-page, .page-product");
+        var productArea = el.closest && el.closest(".js-product-detail, .js-product-container, .product-detail, #product-container, [data-product]");
         if (!productArea) return;
 
         sendDirect(makeEvent(testId, group, "IMAGE_CLICK"));

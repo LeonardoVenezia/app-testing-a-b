@@ -29,9 +29,11 @@ class InstallAppService {
     // Insert response of Authentication API at db.json file
     await userRepository.save(authenticateResponse);
 
-    // Register webhooks for order tracking (macro-conversions)
+    // Register webhooks in background (don't block the redirect)
     if (authenticateResponse.user_id) {
-      await this.registerWebhooks(authenticateResponse.user_id);
+      this.registerWebhooks(authenticateResponse.user_id).catch(function(e) {
+        console.error("[Webhooks] Background registration failed:", e);
+      });
     }
 
     return authenticateResponse;
