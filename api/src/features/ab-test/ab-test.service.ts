@@ -40,8 +40,9 @@ class AbTestService {
       const { id, product_id, created_at, updated_at, ...vData } = v;
       if (data.variant_modifications.price !== undefined && data.variant_modifications.price !== '') {
         vData.price = data.variant_modifications.price;
-        // Also clear promotional_price so the override is the actual selling price
-        vData.promotional_price = null;
+      }
+      if (data.variant_modifications.promotional_price !== undefined) {
+        vData.promotional_price = data.variant_modifications.promotional_price || null;
       }
       return vData;
     }) : [];

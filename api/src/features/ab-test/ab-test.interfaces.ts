@@ -9,6 +9,10 @@ export interface IVariantModifications {
    */
   price?: string;
   /**
+   * If provided, this promotional price will be applied to every variant of the cloned product.
+   */
+  promotional_price?: string;
+  /**
    * If provided, replaces the product images entirely.
    * Each item must have a `src` field (public URL) OR an `attachment` field (base64) 
    * with a `filename`.
