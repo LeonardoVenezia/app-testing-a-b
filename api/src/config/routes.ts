@@ -6,37 +6,41 @@ import { ProductController } from "@features/product";
 import { BillingController } from "@features/billing";
 import { AbTestController } from "@features/ab-test";
 import { TrackingController } from "@features/tracking";
+import { verifyWebhookSignatureMiddleware } from "@middlewares";
+
+// CORS is applied globally in index.ts via smartCors (handles preflight too).
 
 const routes = Router();
+
+// OAuth install redirect — full browser navigation.
 routes.get("/auth/install", AuthenticationController.install);
 
-// --- WEBHOOKS ---
 import { WebhookController } from "@features/webhook";
 import { ScriptTagController } from "@features/script-tag";
 
-// Server the script itself
+// --- SCRIPT TAG ---
 routes.get("/script-tag/storefront.js", ScriptTagController.serveScript as any);
-// Serve the configuration for a specific store
 routes.get("/script-tag/config/:storeId", ScriptTagController.getConfig as any);
-// Log user view interactions
 routes.post("/script-tag/config/:storeId/log-view", ScriptTagController.logView as any);
-// DEBUG: list all scripts registered with Tiendanube for a store
 routes.get("/script-tag/debug/:storeId", ScriptTagController.debugListScripts as any);
-// Re-register the script tag with correct src URL
 routes.post("/script-tag/register/:storeId", ScriptTagController.registerScript as any);
 
+// --- WEBHOOKS (server-to-server from Tiendanube) ---
 routes.post(
   "/webhooks/order-created",
+  verifyWebhookSignatureMiddleware,
   WebhookController.handleOrderCreated as any
 );
 
 routes.post(
   "/webhooks/order-paid",
+  verifyWebhookSignatureMiddleware,
   WebhookController.handleOrderPaid as any
 );
 
 routes.post(
   "/webhooks/order-cancelled",
+  verifyWebhookSignatureMiddleware,
   WebhookController.handleOrderCancelled as any
 );
 
@@ -104,8 +108,6 @@ routes.delete(
 );
 
 // --- BILLING (Plans) ---
-// Depending on auth strategy for admin actions, we might want custom auth or JWT.
-// Since plans are app-wide, we'll secure them using JWT for now assuming an admin is authenticated.
 routes.post(
   "/billing/plans",
   passport.authenticate("jwt", { session: false }),
@@ -123,7 +125,6 @@ routes.delete(
 );
 
 // --- BILLING (Subscriptions) ---
-// Subscriptions relate to the authenticated store.
 routes.get(
   "/billing/subscription",
   passport.authenticate("jwt", { session: false }),

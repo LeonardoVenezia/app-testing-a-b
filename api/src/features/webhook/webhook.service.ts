@@ -183,23 +183,39 @@ class WebhookService {
     const siblingId = isOriginal ? test.variant_product_id : test.original_product_id;
 
     try {
-      const sibling = (await tiendanubeApiClient.get(
-        `${storeId}/products/${siblingId}`
-      )) as any;
+      // Serialize concurrent stock syncs for the same test using a Postgres
+      // transaction-scoped advisory lock keyed by test.id. The lock is held
+      // for the whole GET-modify-PUT cycle against Tiendanube, preventing
+      // two simultaneous webhooks from reading the same stock value and
+      // overwriting each other. The lock is auto-released when the
+      // transaction ends (commit, rollback, or timeout).
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(
+            `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`,
+            test.id
+          );
 
-      if (!sibling?.variants?.length) return;
+          const sibling = (await tiendanubeApiClient.get(
+            `${storeId}/products/${siblingId}`
+          )) as any;
 
-      const sv = sibling.variants[0];
-      if (sv.stock === null || sv.stock === undefined) return;
+          if (!sibling?.variants?.length) return;
 
-      const newStock =
-        action === "decrease"
-          ? Math.max(0, sv.stock - quantity)
-          : sv.stock + quantity;
+          const sv = sibling.variants[0];
+          if (sv.stock === null || sv.stock === undefined) return;
 
-      await tiendanubeApiClient.put(
-        `${storeId}/products/${siblingId}/variants/${sv.id}`,
-        { stock: newStock }
+          const newStock =
+            action === "decrease"
+              ? Math.max(0, sv.stock - quantity)
+              : sv.stock + quantity;
+
+          await tiendanubeApiClient.put(
+            `${storeId}/products/${siblingId}/variants/${sv.id}`,
+            { stock: newStock }
+          );
+        },
+        { timeout: 30_000, maxWait: 10_000 }
       );
     } catch (e: any) {
       console.error(`Failed to sync stock for sibling ${siblingId}:`, e.message);

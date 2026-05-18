@@ -6,7 +6,19 @@ import { HttpErrorException } from "@utils";
 
 class AbTestService {
   async create(store_id: number, data: ICreateAbTestRequest): Promise<AbTest> {
-    // 0. Check no active test exists for this product
+    // 0a. Validate name
+    const trimmedName = (data.name || "").trim();
+    if (!trimmedName) {
+      throw new HttpErrorException("El nombre del test es obligatorio").setStatusCode(400);
+    }
+
+    // 0b. Check no active test exists with the same name (case-insensitive)
+    const sameName = await abTestRepository.findActiveByName(store_id, trimmedName);
+    if (sameName) {
+      throw new HttpErrorException("Ya existe un test activo con ese nombre").setStatusCode(409);
+    }
+
+    // 0c. Check no active test exists for this product
     const existing = await abTestRepository.findActiveByProductId(store_id, data.original_product_id);
     if (existing) {
       throw new HttpErrorException("Ya existe un test activo para este producto").setStatusCode(409);
@@ -79,7 +91,7 @@ class AbTestService {
     // 4. Persist in database
     const newTest = await abTestRepository.create({
       store_id,
-      name: data.name,
+      name: trimmedName,
       status: TestStatus.ACTIVE,
       original_product_id: data.original_product_id,
       variant_product_id: createdVariant.id,
@@ -112,12 +124,35 @@ class AbTestService {
     // Verify ownership first
     const test = await abTestRepository.findOne(store_id, test_id);
 
-    // When reactivating, check no other active test exists for this product
+    // When reactivating, check no other active test conflicts (product + name)
     if (status === TestStatus.ACTIVE) {
-      const existing = await abTestRepository.findActiveByProductId(store_id, test.original_product_id);
-      if (existing && existing.id !== test_id) {
+      const existingProduct = await abTestRepository.findActiveByProductId(store_id, test.original_product_id);
+      if (existingProduct && existingProduct.id !== test_id) {
         throw new HttpErrorException("Ya existe otro test activo para este producto").setStatusCode(409);
       }
+      const existingName = await abTestRepository.findActiveByName(store_id, test.name);
+      if (existingName && existingName.id !== test_id) {
+        throw new HttpErrorException("Ya existe otro test activo con ese nombre").setStatusCode(409);
+      }
+    }
+
+    // Hide the variant (mirror) product when pausing / finishing; re-publish on
+    // reactivate. We toggle `published` rather than deleting so the product
+    // and its sales history stay intact in Tiendanube.
+    const shouldBePublished = status === TestStatus.ACTIVE;
+    try {
+      console.log(
+        `[AbTest] Toggling variant ${test.variant_product_id} published=${shouldBePublished} (status ${test.status} → ${status})`
+      );
+      await tiendanubeApiClient.put(`${store_id}/products/${test.variant_product_id}`, {
+        published: shouldBePublished,
+      });
+      console.log(`[AbTest] ✓ Variant ${test.variant_product_id} published=${shouldBePublished}`);
+    } catch (e: any) {
+      console.warn(
+        `[AbTest] ✗ Failed to set published=${shouldBePublished} on variant ${test.variant_product_id}:`,
+        e?.response?.data || e?.response?.status || e.message
+      );
     }
 
     return abTestRepository.updateStatus(test_id, status);

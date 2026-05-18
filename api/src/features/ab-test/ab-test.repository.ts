@@ -61,6 +61,17 @@ class AbTestRepository {
       },
     });
   }
+
+  async findActiveByName(store_id: number, name: string): Promise<AbTest | null> {
+    return prisma.abTest.findFirst({
+      where: {
+        store_id,
+        status: "ACTIVE",
+        deleted_at: null,
+        name: { equals: name.trim(), mode: "insensitive" },
+      },
+    });
+  }
 }
 
 export default new AbTestRepository();

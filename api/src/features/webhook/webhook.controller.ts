@@ -14,6 +14,7 @@ class WebhookController {
   async handleOrderCreated(req: Request, res: Response) {
     try {
       const storeId = extractStoreId(req);
+      console.log(`[Webhook] ▶ order/created arrived storeId=${storeId} orderId=${req.body?.id}`);
       if (!storeId) return res.status(StatusCode.BAD_REQUEST).send("Missing store ID");
       res.status(StatusCode.OK).send("Acknowledged");
       await WebhookService.handleOrderCreated(storeId, req.body);
@@ -25,6 +26,7 @@ class WebhookController {
   async handleOrderPaid(req: Request, res: Response) {
     try {
       const storeId = extractStoreId(req);
+      console.log(`[Webhook] ▶ order/paid arrived storeId=${storeId} orderId=${req.body?.id}`);
       if (!storeId) return res.status(StatusCode.BAD_REQUEST).send("Missing store ID");
       res.status(StatusCode.OK).send("Acknowledged");
       await WebhookService.handleOrderPaid(storeId, req.body);
@@ -36,6 +38,7 @@ class WebhookController {
   async handleOrderCancelled(req: Request, res: Response) {
     try {
       const storeId = extractStoreId(req);
+      console.log(`[Webhook] ▶ order/cancelled arrived storeId=${storeId} orderId=${req.body?.id}`);
       if (!storeId) return res.status(StatusCode.BAD_REQUEST).send("Missing store ID");
       res.status(StatusCode.OK).send("Acknowledged");
       await WebhookService.handleOrderCancelled(storeId, req.body);

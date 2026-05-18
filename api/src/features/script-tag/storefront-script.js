@@ -129,20 +129,35 @@
       }
 
       // --- Hide products from wrong group ---
+      // IDs from Tiendanube are always numeric; filter and coerce defensively
+      // to neutralize any CSS/attribute-selector injection via malformed data.
+      function safeId(v) {
+        var n = parseInt(v, 10);
+        return (isFinite(n) && n > 0 && String(n) === String(v).trim()) ? String(n) : null;
+      }
+      function cssEsc(s) {
+        if (typeof window.CSS !== "undefined" && typeof window.CSS.escape === "function") {
+          return window.CSS.escape(s);
+        }
+        return String(s).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+      }
+
       var hiddenIds = tests.map(function(t) {
         return groups[t.id] === "A" ? t.variant_product_id : t.original_product_id;
-      });
+      }).map(safeId).filter(function(id) { return id !== null; });
 
       var css = hiddenIds.map(function(id) {
-        return '[data-product="'+id+'"], [data-product-id="'+id+'"], [data-item-id="'+id+'"], .product-item[data-product-id="'+id+'"], [data-product-id="'+id+'"].js-item-product { display: none !important; }';
+        var e = cssEsc(id);
+        return '[data-product="'+e+'"], [data-product-id="'+e+'"], [data-item-id="'+e+'"], .product-item[data-product-id="'+e+'"], [data-product-id="'+e+'"].js-item-product { display: none !important; }';
       }).join("\n");
       var style = document.createElement("style");
-      style.innerHTML = css;
+      style.appendChild(document.createTextNode(css));
       document.head.appendChild(style);
 
       function hideByDataAttr() {
         hiddenIds.forEach(function(id) {
-          document.querySelectorAll('[data-product-id="'+id+'"]:not([data-ab-checked])').forEach(function(el) {
+          var e = cssEsc(id);
+          document.querySelectorAll('[data-product-id="'+e+'"]:not([data-ab-checked])').forEach(function(el) {
             el.setAttribute("data-ab-checked", "true");
             var c = el.closest(".js-item-product, .item, .product, .product-card, .grid-item, article, li") || el;
             c.style.display = "none";

@@ -1,7 +1,5 @@
 import express from "express";
-import cors from "cors";
 import morgan from "morgan";
-import passport from "passport";
 // @ts-ignore
 import dotenv from "dotenv";
 import path from "path";
@@ -10,7 +8,7 @@ dotenv.config({
   path: path.resolve(".env"),
 });
 
-import { AppRoutes } from "@config";
+import { AppRoutes, smartCors } from "@config";
 import {
   beforeCheckClientMiddleware,
   errorHandlingMiddleware,
@@ -23,8 +21,19 @@ const app = express();
 app.use(
   morgan(":method :url :status :res[content-length] - :response-time ms")
 );
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
+// CORS must be registered globally (not per-route) so it also catches the
+// preflight OPTIONS that Express auto-handles otherwise. smartCors picks the
+// right policy per path (open for storefronts, whitelist for the dashboard,
+// none for webhooks / OAuth).
+app.use(smartCors);
+app.use(
+  express.json({
+    limit: "50mb",
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  })
+);
 app.use(express.text({ type: "text/plain", limit: "1mb" }));
 app.use(beforeCheckClientMiddleware);
 app.use(AppRoutes);

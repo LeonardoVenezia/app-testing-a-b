@@ -32,14 +32,20 @@ class TrackingController {
 
     // Validate required fields
     if (!store_id || !test_id || !variant || !event_type || !session_id) {
+      console.warn("[Tracking] 400 missing fields:", {
+        event_type, has_store_id: !!store_id, has_test_id: !!test_id,
+        has_variant: !!variant, has_session: !!session_id,
+      });
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     if (!["A", "B"].includes(variant)) {
+      console.warn("[Tracking] 400 invalid variant:", variant);
       return res.status(400).json({ error: "Invalid variant" });
     }
 
     if (!VALID_EVENT_TYPES.includes(event_type)) {
+      console.warn("[Tracking] 400 invalid event_type:", event_type);
       return res.status(400).json({ error: "Invalid event_type" });
     }
 
@@ -50,6 +56,7 @@ class TrackingController {
     });
 
     if (!test) {
+      console.warn(`[Tracking] 404 test not active: event=${event_type} test_id=${test_id} store=${store_id}`);
       return res.status(404).json({ error: "Test not found or inactive" });
     }
 
@@ -61,6 +68,7 @@ class TrackingController {
         session_id,
         payload: payload || undefined,
       });
+      console.log(`[Tracking] ✓ ${event_type} variant=${variant} test=${test_id} session=${session_id}`);
 
       // Also increment legacy counters for backward compat
       if (event_type === "PAGE_VIEW") {
