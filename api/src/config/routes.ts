@@ -6,7 +6,11 @@ import { ProductController } from "@features/product";
 import { BillingController } from "@features/billing";
 import { AbTestController } from "@features/ab-test";
 import { TrackingController } from "@features/tracking";
-import { verifyWebhookSignatureMiddleware } from "@middlewares";
+import {
+  verifyWebhookSignatureMiddleware,
+  trackingRateLimit,
+  scriptConfigRateLimit,
+} from "@middlewares";
 
 // CORS is applied globally in index.ts via smartCors (handles preflight too).
 
@@ -20,8 +24,8 @@ import { ScriptTagController } from "@features/script-tag";
 
 // --- SCRIPT TAG ---
 routes.get("/script-tag/storefront.js", ScriptTagController.serveScript as any);
-routes.get("/script-tag/config/:storeId", ScriptTagController.getConfig as any);
-routes.post("/script-tag/config/:storeId/log-view", ScriptTagController.logView as any);
+routes.get("/script-tag/config/:storeId", scriptConfigRateLimit, ScriptTagController.getConfig as any);
+routes.post("/script-tag/config/:storeId/log-view", scriptConfigRateLimit, ScriptTagController.logView as any);
 routes.get("/script-tag/debug/:storeId", ScriptTagController.debugListScripts as any);
 routes.post("/script-tag/register/:storeId", ScriptTagController.registerScript as any);
 
@@ -45,7 +49,7 @@ routes.post(
 );
 
 // --- TRACKING (public, no auth - called from storefront) ---
-routes.post("/api/track", TrackingController.ingest as any);
+routes.post("/api/track", trackingRateLimit, TrackingController.ingest as any);
 // --- TRACKING (authenticated - dashboard metrics) ---
 routes.get(
   "/api/track/metrics/:testId",

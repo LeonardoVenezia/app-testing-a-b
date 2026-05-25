@@ -1,16 +1,29 @@
 import { NextFunction, Request, Response } from "express";
-import { StatusCode } from "@utils";
+import { ZodError } from "zod";
+import { BadRequestException, StatusCode } from "@utils";
 import AbTestService from "./ab-test.service";
 import { TestStatus } from "@prisma/client";
+import { createAbTestSchema, updateAbTestStatusSchema } from "./ab-test.schemas";
 
 export interface AuthenticatedRequest extends Request {
   user: { user_id: number };
 }
 
+function toBadRequest(err: ZodError): BadRequestException {
+  const first = err.issues[0];
+  const path = first?.path?.join(".") || "input";
+  return new BadRequestException(
+    `Datos inválidos: ${path} — ${first?.message || "validation failed"}`,
+    JSON.stringify(err.issues)
+  );
+}
+
 class AbTestController {
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const data = await AbTestService.create(req.user.user_id, req.body);
+      const parsed = createAbTestSchema.safeParse(req.body);
+      if (!parsed.success) return next(toBadRequest(parsed.error));
+      const data = await AbTestService.create(req.user.user_id, parsed.data);
       return res.status(StatusCode.CREATED).json(data);
     } catch (e) {
       next(e);
@@ -44,11 +57,12 @@ class AbTestController {
     next: NextFunction
   ) {
     try {
-      const { status } = req.body;
+      const parsed = updateAbTestStatusSchema.safeParse(req.body);
+      if (!parsed.success) return next(toBadRequest(parsed.error));
       const data = await AbTestService.updateStatus(
         req.user.user_id,
         req.params.id,
-        status as TestStatus
+        parsed.data.status as TestStatus
       );
       return res.status(StatusCode.OK).json(data);
     } catch (e) {

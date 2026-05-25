@@ -690,6 +690,7 @@ __metadata:
     cors: ^2.8.5
     dotenv: ^8.2.0
     express: ^4.18.2
+    express-rate-limit: ^8.5.2
     morgan: ^1.10.0
     nodemon: ^2.0.22
     passport: ^0.5.2
@@ -699,6 +700,7 @@ __metadata:
     ts-node: ^10.9.1
     tsconfig-paths: ^4.2.0
     typescript: ^5.1.3
+    zod: ^4.4.3
   languageName: unknown
   linkType: soft
 
@@ -1292,6 +1294,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"express-rate-limit@npm:^8.5.2":
+  version: 8.5.2
+  resolution: "express-rate-limit@npm:8.5.2"
+  dependencies:
+    ip-address: ^10.2.0
+  peerDependencies:
+    express: ">= 4.11"
+  checksum: 2a8d508aca4489597b41fb63accd6aac8f10506edb2567180c8375c4170d48651f7bf417079c45421bdefba3c0422a7d06615ba99cd88ca67cbbdf977e71f405
+  languageName: node
+  linkType: hard
+
 "express@npm:^4.18.2":
   version: 4.18.2
   resolution: "express@npm:4.18.2"
@@ -1713,6 +1726,13 @@ __metadata:
   version: 2.0.4
   resolution: "inherits@npm:2.0.4"
   checksum: 4a48a733847879d6cf6691860a6b1e3f0f4754176e4d71494c41f3475553768b10f84b5ce1d40fbd0e34e6bfbb864ee35858ad4dd2cf31e02fc4a154b724d7f1
+  languageName: node
+  linkType: hard
+
+"ip-address@npm:^10.2.0":
+  version: 10.2.0
+  resolution: "ip-address@npm:10.2.0"
+  checksum: 3ffba04dc4cdaf81ed2ed6edc47eee1494bb97550ef73f1918ca28405d175c03efa416b8337e868123b08c2cc677e3a07c5ce03eda3b1aeb2741c149bd37ddf9
   languageName: node
   linkType: hard
 
@@ -3351,5 +3371,12 @@ __metadata:
     grammex: ^3.1.11
     graphmatch: ^1.1.0
   checksum: bef5e7c828975ec317142b10378cd4d90533a1736c79f18fb30418d17fe1d79182854450774ef19f605982c61b6befe52669eb727ef5dbc144707fb59cb125f2
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.4.3":
+  version: 4.4.3
+  resolution: "zod@npm:4.4.3"
+  checksum: bf236fdee7a5a5ec645eef5bfea3aad34e7df912931c2a23bc17e5b59882482751da42392916529da52ff9bc70f584797a5d496f1fb81f2d1a4c90fdd3922d2a
   languageName: node
   linkType: hard

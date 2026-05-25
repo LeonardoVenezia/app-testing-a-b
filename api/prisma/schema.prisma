@@ -69,3 +69,24 @@ model TrackingEvent {
   @@index([test_id, session_id, event_type])
   @@index([session_id])
 }
+
+// Dead-letter queue for webhooks. When processing a Tiendanube webhook
+// throws (TN API blip, DB hiccup, etc.) the payload is parked here so a
+// background worker can retry it with exponential backoff instead of losing
+// the event silently.
+model WebhookDlq {
+  id             String    @id @default(uuid())
+  event_type     String    // e.g. "order/created", "order/paid", "order/cancelled"
+  store_id       Int
+  payload        Json
+  attempts       Int       @default(0)
+  last_error     String?
+  next_retry_at  DateTime  @default(now())
+  resolved       Boolean   @default(false)
+  resolved_at    DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  @@index([resolved, next_retry_at])
+  @@index([store_id])
+}

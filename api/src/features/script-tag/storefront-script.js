@@ -95,12 +95,30 @@
       if (!tests || tests.length === 0) return;
 
       // --- Group assignment ---
+      // Deterministic: hash (sessionId + testId) with FNV-1a and pick A/B by
+      // parity. The same user/test always lands on the same group, so even if
+      // the script runs multiple times before the cookie is persisted (fast
+      // reloads, multiple tabs), there is no drift. Random() would give 50/50
+      // *globally* across users but is non-deterministic per-call, which
+      // contaminated sessions when fired more than once.
+      function fnv1a(str) {
+        var hash = 0x811c9dc5;
+        for (var i = 0; i < str.length; i++) {
+          hash ^= str.charCodeAt(i);
+          hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+        }
+        return hash;
+      }
+      function assignGroup(testId) {
+        return (fnv1a(sessionId + ":" + testId) % 2) === 0 ? "A" : "B";
+      }
+
       var groups = {};
       tests.forEach(function(test) {
         var ck = "ab_test_group_" + test.id;
         var g = getCookie(ck);
         if (!g) {
-          g = Math.random() < 0.5 ? "A" : "B";
+          g = assignGroup(test.id);
           setCookie(ck, g, 30);
         }
         groups[test.id] = g;

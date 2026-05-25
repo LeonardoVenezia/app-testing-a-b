@@ -4,6 +4,32 @@ import { AbTest, TestStatus } from "@prisma/client";
 import { tiendanubeApiClient } from "@config";
 import { HttpErrorException } from "@utils";
 
+// Small TTL cache for product lookups against Tiendanube. The dashboard list
+// view enriches every test with the original product's name + image; without
+// caching this is O(N) calls per dashboard refresh. 60s is short enough that
+// merchant edits to a product propagate quickly, long enough to absorb burst
+// refreshes from the same admin session.
+type CachedProduct = { image_url: string; product_name: string };
+const PRODUCT_CACHE_TTL_MS = 60_000;
+const productCache = new Map<string, { data: CachedProduct; expires: number }>();
+
+function getCachedProduct(storeId: number, productId: number): CachedProduct | null {
+  const entry = productCache.get(`${storeId}:${productId}`);
+  if (!entry) return null;
+  if (entry.expires <= Date.now()) {
+    productCache.delete(`${storeId}:${productId}`);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedProduct(storeId: number, productId: number, data: CachedProduct): void {
+  productCache.set(`${storeId}:${productId}`, {
+    data,
+    expires: Date.now() + PRODUCT_CACHE_TTL_MS,
+  });
+}
+
 class AbTestService {
   async create(store_id: number, data: ICreateAbTestRequest): Promise<AbTest> {
     // 0a. Validate name
@@ -179,15 +205,25 @@ class AbTestService {
 
   private async enrichWithProductData(store_id: number, tests: AbTest[]) {
     const productIds = [...new Set(tests.map(t => t.original_product_id))];
-    const productMap = new Map<number, { image_url: string; product_name: string }>();
+    const productMap = new Map<number, CachedProduct>();
+
+    // Serve from cache first; only fetch what's missing or expired.
+    const toFetch: number[] = [];
+    for (const pid of productIds) {
+      const cached = getCachedProduct(store_id, pid);
+      if (cached) productMap.set(pid, cached);
+      else toFetch.push(pid);
+    }
 
     await Promise.allSettled(
-      productIds.map(async (pid) => {
+      toFetch.map(async (pid) => {
         try {
           const product: any = await tiendanubeApiClient.get(`${store_id}/products/${pid}`);
           const name = product.name?.es || product.name?.pt || product.name?.en || '';
           const image = product.images?.[0]?.src || '';
-          productMap.set(pid, { image_url: image, product_name: name });
+          const entry: CachedProduct = { image_url: image, product_name: name };
+          productMap.set(pid, entry);
+          setCachedProduct(store_id, pid, entry);
         } catch { /* product may have been deleted */ }
       })
     );

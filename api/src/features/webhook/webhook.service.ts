@@ -3,17 +3,54 @@ import { TestStatus } from "@prisma/client";
 import { tiendanubeApiClient } from "@config";
 import trackingRepository from "../tracking/tracking.repository";
 
+// Thrown when a webhook handler hits a problem that should trigger a retry
+// (network blip, Tiendanube 5xx, DB hiccup). Non-retryable problems
+// (missing order_id, 404 from TN, payload-level rejection) do NOT throw.
+export class WebhookRetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WebhookRetryableError";
+  }
+}
+
 class WebhookService {
   /**
-   * Fetch full order from Tiendanube API since webhook payloads
-   * only contain a minimal summary (id, store_id) without products.
+   * Fetch full order from Tiendanube API. Webhook payloads only carry
+   * (id, store_id), so we hydrate from the orders endpoint.
+   * - 404 → returns null (order genuinely gone, no retry).
+   * - 5xx / network → throws WebhookRetryableError (worker will retry).
    */
   private async fetchFullOrder(storeId: number, orderId: number): Promise<any | null> {
     try {
       return await tiendanubeApiClient.get(`${storeId}/orders/${orderId}`) as any;
     } catch (e: any) {
-      console.error(`[Webhook] Failed to fetch order ${orderId} for store ${storeId}:`, e.message);
+      const status = e?.response?.status;
+      if (status === 404) {
+        console.warn(`[Webhook] Order ${orderId} not found (404) for store ${storeId} — skipping.`);
+        return null;
+      }
+      const transient = !status || status >= 500 || status === 429;
+      const msg = `Failed to fetch order ${orderId} for store ${storeId}: ${e.message} (status ${status ?? "n/a"})`;
+      console.error(`[Webhook] ${msg}`);
+      if (transient) throw new WebhookRetryableError(msg);
       return null;
+    }
+  }
+
+  /**
+   * Single entry-point used by both the live controller and the DLQ worker.
+   * Routes the event to the matching handler by event_type string.
+   */
+  async dispatch(eventType: string, storeId: number, payload: any) {
+    switch (eventType) {
+      case "order/created":
+        return this.handleOrderCreated(storeId, payload);
+      case "order/paid":
+        return this.handleOrderPaid(storeId, payload);
+      case "order/cancelled":
+        return this.handleOrderCancelled(storeId, payload);
+      default:
+        throw new Error(`Unknown webhook event_type: ${eventType}`);
     }
   }
 
@@ -25,8 +62,9 @@ class WebhookService {
     const order = await this.fetchFullOrder(storeId, orderId);
     if (!order?.products?.length) { console.warn(`[Webhook] Order ${orderId} has no products or fetch failed`); return; }
 
+    const processedTests = new Set<string>();
     for (const item of order.products) {
-      await this.processOrderItem(storeId, order, item, "created");
+      await this.processOrderItem(storeId, order, item, "created", processedTests);
     }
   }
 
@@ -51,8 +89,9 @@ class WebhookService {
     const order = await this.fetchFullOrder(storeId, orderId);
     if (!order?.products?.length) { console.warn(`[Webhook] Order ${orderId} has no products or fetch failed`); return; }
 
+    const processedTests = new Set<string>();
     for (const item of order.products) {
-      await this.processOrderItem(storeId, order, item, "paid");
+      await this.processOrderItem(storeId, order, item, "paid", processedTests);
     }
   }
 
@@ -60,7 +99,8 @@ class WebhookService {
     storeId: number,
     orderData: any,
     item: any,
-    stage: "created" | "paid"
+    stage: "created" | "paid",
+    processedTests: Set<string>
   ) {
     const productId = item.product_id;
     const quantity = item.quantity || 1;
@@ -80,31 +120,23 @@ class WebhookService {
 
     if (!test) return;
 
+    // One conversion event per test per order (handles multi-item orders)
+    if (processedTests.has(test.id)) return;
+    processedTests.add(test.id);
+
     const isOriginal = test.original_product_id === productId;
     const variant = isOriginal ? "A" : "B";
     const eventType = stage === "created" ? "ORDER_COMPLETED" : "ORDER_PAID";
+    const sessionId = "webhook_" + orderData.id;
 
-    // Attribute this order to a storefront session.
-    // Priority: CHECKOUT_STARTED > ADD_TO_CART > PAGE_VIEW (most recent within 24h)
-    let sessionId = "webhook_" + (orderData.id || Date.now());
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const recentEvent = await prisma.trackingEvent.findFirst({
-      where: {
-        test_id: test.id,
-        variant,
-        event_type: { in: ["CHECKOUT_STARTED", "ADD_TO_CART", "PAGE_VIEW"] },
-        created_at: { gte: oneDayAgo },
-      },
-      orderBy: [
-        // Prefer the deepest funnel event first, then most recent
-        { event_type: "desc" },
-        { created_at: "desc" },
-      ],
-      select: { session_id: true },
+    // Deduplicate retries: skip if already recorded
+    const alreadyRecorded = await prisma.trackingEvent.findFirst({
+      where: { test_id: test.id, session_id: sessionId, event_type: eventType, variant },
+      select: { id: true },
     });
-    if (recentEvent && !recentEvent.session_id.startsWith("webhook_")) {
-      sessionId = recentEvent.session_id;
+    if (alreadyRecorded) {
+      console.log(`[Webhook] Skipping duplicate ${eventType} for order ${orderData.id} variant ${variant}`);
+      return;
     }
 
     // Record the tracking event

@@ -105,11 +105,18 @@ class TrackingRepository {
     // Bounce rate: sessions with PAGE_VIEW but no interaction events
     const interactionTypes = new Set(["IMAGE_CLICK", "DESCRIPTION_INTERACTION", "ADD_TO_CART", "CHECKOUT_STARTED", "ORDER_COMPLETED"]);
     const bounces = { A: 0, B: 0 };
+    // sessionVariant tracks the variant for each sessionKey (can't rely on endsWith)
+    const sessionVariant: Record<string, string> = {};
+    for (const e of events) {
+      const key = e.session_id + "_" + e.variant;
+      sessionVariant[key] = e.variant;
+    }
     for (const [sessionKey, eventTypes] of Object.entries(sessionEvents)) {
       if (!eventTypes.has("PAGE_VIEW")) continue;
-      const variant = sessionKey.endsWith("_A") ? "A" : "B";
+      const variant = sessionVariant[sessionKey];
+      if (!variant) continue;
       const hasInteraction = [...eventTypes].some(t => interactionTypes.has(t));
-      if (!hasInteraction) bounces[variant]++;
+      if (!hasInteraction) bounces[variant as "A" | "B"]++;
     }
 
     // Derived metrics
